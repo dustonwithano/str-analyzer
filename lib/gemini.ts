@@ -18,7 +18,14 @@ const MARKET_FALLBACK: STRMarketEstimate = {
   confidenceLevel: 'low',
 }
 
-export async function estimateSTRMarket(address: string): Promise<STRMarketEstimate> {
+export interface PropertyContext {
+  purchasePrice?: number
+  beds?: number
+  baths?: number
+  sqft?: number
+}
+
+export async function estimateSTRMarket(address: string, property?: PropertyContext): Promise<STRMarketEstimate> {
   try {
     const apiKey = process.env.GEMINI_API_KEY
     if (!apiKey) return MARKET_FALLBACK
@@ -26,9 +33,17 @@ export async function estimateSTRMarket(address: string): Promise<STRMarketEstim
     const genAI = new GoogleGenerativeAI(apiKey)
     const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' })
 
+    const propertyLines = property ? [
+      property.beds != null ? `- Bedrooms: ${property.beds}` : null,
+      property.baths != null ? `- Bathrooms: ${property.baths}` : null,
+      property.sqft != null ? `- Square footage: ${property.sqft.toLocaleString()} sqft` : null,
+      property.purchasePrice != null ? `- Purchase price: $${property.purchasePrice.toLocaleString()}` : null,
+    ].filter(Boolean).join('\n') : null
+
     const prompt = `You are an expert short-term rental market analyst. Given the property address below, provide STR market estimates. Return ONLY valid JSON — no markdown, no backticks, no extra text.
 
 ADDRESS: ${address}
+${propertyLines ? `\nPROPERTY DETAILS:\n${propertyLines}\n` : ''}
 
 Instructions:
 - adr: estimated average nightly rate for a typical STR in this market ($USD)

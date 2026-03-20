@@ -5,22 +5,35 @@ import { runUnderwriting } from '@/lib/underwriting'
 import { saveDeal, slugify } from '@/lib/redis'
 import type { DealInputs, FetchedData, FullDeal, RabbuData } from '@/lib/types'
 
+interface PropertyDetails {
+  purchasePrice?: number
+  beds?: number
+  baths?: number
+  sqft?: number
+  propertyTaxAnnual?: number
+}
+
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 
 export async function POST(req: Request) {
   try {
     const body = await req.json()
-    const { address, overrides = {} } = body as { address: string; overrides?: Partial<DealInputs> }
+    const { address, overrides = {}, propertyDetails = {} } = body as {
+      address: string
+      overrides?: Partial<DealInputs>
+      propertyDetails?: PropertyDetails
+    }
 
     if (!address?.trim()) {
       return NextResponse.json({ error: 'Address is required' }, { status: 400 })
     }
 
-    // 1. Gemini market estimate + Zillow property data in parallel
+    // 1. Gemini market estimate + Zillow (skip Zillow if caller already provided property details)
+    const hasPropertyDetails = propertyDetails.purchasePrice != null
     const [market, zillow] = await Promise.all([
-      estimateSTRMarket(address.trim()),
-      fetchZillowData(address.trim()),
+      estimateSTRMarket(address.trim(), propertyDetails),
+      hasPropertyDetails ? Promise.resolve(null) : fetchZillowData(address.trim()),
     ])
 
     const rabbu: RabbuData = {
@@ -53,10 +66,10 @@ export async function POST(req: Request) {
       propertyImage: { url: null, source: 'placeholder', isFallback: true },
     }
 
-    // 2. Build inputs — Zillow wins for property-specific data, Gemini fills gaps
-    const purchasePrice = zillow?.listPrice ?? zillow?.zestimate ?? market.estimatedPurchasePrice
+    // 2. Build inputs — user-confirmed details win, then Zillow, then Gemini estimates
+    const purchasePrice = propertyDetails.purchasePrice ?? zillow?.listPrice ?? zillow?.zestimate ?? market.estimatedPurchasePrice
     const interestRate = market.mortgageRate
-    const propertyTaxAnnual = zillow?.propertyTaxAnnual ?? purchasePrice * market.propertyTaxRate
+    const propertyTaxAnnual = propertyDetails.propertyTaxAnnual ?? zillow?.propertyTaxAnnual ?? purchasePrice * market.propertyTaxRate
 
     const baseInputs: DealInputs = {
       purchasePrice,
