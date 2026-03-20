@@ -40,22 +40,37 @@ export async function estimateSTRMarket(address: string, property?: PropertyCont
       property.purchasePrice != null ? `- Purchase price: $${property.purchasePrice.toLocaleString()}` : null,
     ].filter(Boolean).join('\n') : null
 
-    const prompt = `You are an expert short-term rental market analyst. Given the property address below, provide STR market estimates. Return ONLY valid JSON — no markdown, no backticks, no extra text.
+    const prompt = `You are a conservative short-term rental underwriter. Your job is to produce realistic, defensible STR estimates that protect investors from overpaying — not to make deals look attractive. Err on the side of caution. Return ONLY valid JSON — no markdown, no backticks, no extra text.
 
 ADDRESS: ${address}
 ${propertyLines ? `\nPROPERTY DETAILS:\n${propertyLines}\n` : ''}
 
-Instructions:
-- adr: estimated average nightly rate for a typical STR in this market ($USD)
-- occupancyRate: estimated annual occupancy as a decimal (e.g. 0.65 for 65%)
+CRITICAL RULES:
+- All estimates must reflect ANNUAL AVERAGES weighted across all 365 nights, including slow weekdays, off-season months, and shoulder periods. Do NOT use peak season or weekend rates as your estimate.
+- occupancyRate is what a NEW, median-performing listing achieves in year 1 — not an established top performer. Most STRs do not exceed 60% annual occupancy.
+- adr is the average nightly rate across all BOOKED nights for a median listing, not the listing price or what top properties charge.
+- marketADR and marketOccupancy are the 50th percentile of active listings in this market — the true baseline, not aspirational.
+
+REALISTIC OCCUPANCY RANGES BY MARKET TYPE (use these as your upper bounds):
+- Coastal beach (seasonal): 48–60% annual avg
+- Urban/city: 52–62% annual avg
+- Ski/mountain (seasonal): 42–55% annual avg
+- Lake house (seasonal): 45–58% annual avg
+- Desert resort (e.g. Palm Springs, Scottsdale): 50–60% annual avg
+- Rural/cabin: 38–52% annual avg
+- Suburban/generic: 40–52% annual avg
+
+INSTRUCTIONS:
+- adr: median nightly rate for a booked night for this property type and size in this market
+- occupancyRate: realistic annual occupancy decimal (e.g. 0.52 for 52%) — stay within the ranges above
 - revPAR: adr × occupancyRate
-- marketADR/marketOccupancy/marketRevPAR: broader market benchmarks for the area (slightly more conservative than the individual property estimate)
-- estimatedPurchasePrice: typical purchase price for an STR-viable property in this specific neighborhood/market
-- propertyTaxRate: estimated annual property tax as decimal of property value (e.g. 0.012 for 1.2%)
+- marketADR/marketOccupancy/marketRevPAR: 50th percentile benchmarks for all active STRs in this market
+- estimatedPurchasePrice: realistic purchase price for an STR-viable property matching the provided details in this market
+- propertyTaxRate: estimated annual property tax as decimal of assessed value (e.g. 0.012 for 1.2%)
 - mortgageRate: current approximate 30-year fixed mortgage rate as decimal (e.g. 0.069)
-- marketType: short label e.g. "coastal beach", "urban", "ski/mountain", "lake house", "desert", "rural", "suburban"
-- seasonalityNote: one sentence describing peak/shoulder/off-season patterns
-- confidenceLevel: "high" if well-known STR market, "medium" if moderate data, "low" if limited info
+- marketType: one of "coastal beach", "urban", "ski/mountain", "lake house", "desert resort", "rural/cabin", "suburban"
+- seasonalityNote: one sentence on peak vs off-season — include how many months are low season
+- confidenceLevel: "high" if well-known STR market with clear data, "medium" if limited info, "low" if very little data
 
 Return exactly this JSON:
 {
