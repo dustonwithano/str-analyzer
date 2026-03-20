@@ -24,7 +24,7 @@ export async function estimateSTRMarket(address: string): Promise<STRMarketEstim
     if (!apiKey) return MARKET_FALLBACK
 
     const genAI = new GoogleGenerativeAI(apiKey)
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-preview-04-17' })
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' })
 
     const prompt = `You are an expert short-term rental market analyst. Given the property address below, provide STR market estimates. Return ONLY valid JSON — no markdown, no backticks, no extra text.
 
@@ -106,7 +106,7 @@ export async function generateDealSummary(deal: FullDeal): Promise<AISummary> {
     if (!apiKey) return FALLBACK
 
     const genAI = new GoogleGenerativeAI(apiKey)
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash-preview-04-17' })
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash' })
 
     const { analysis, inputs, fetched } = deal
     const cocPct = (analysis.cashOnCashReturn * 100).toFixed(1)
