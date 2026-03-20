@@ -1,5 +1,92 @@
 import { GoogleGenerativeAI } from '@google/generative-ai'
-import type { FullDeal, AISummary } from './types'
+import type { FullDeal, AISummary, STRMarketEstimate } from './types'
+
+const MARKET_FALLBACK: STRMarketEstimate = {
+  city: '',
+  state: '',
+  adr: 185,
+  occupancyRate: 0.58,
+  revPAR: 107,
+  marketADR: 185,
+  marketOccupancy: 0.58,
+  marketRevPAR: 107,
+  estimatedPurchasePrice: 550000,
+  propertyTaxRate: 0.012,
+  mortgageRate: 0.069,
+  marketType: 'unknown',
+  seasonalityNote: 'Seasonality data unavailable.',
+  confidenceLevel: 'low',
+}
+
+export async function estimateSTRMarket(address: string): Promise<STRMarketEstimate> {
+  try {
+    const apiKey = process.env.GEMINI_API_KEY
+    if (!apiKey) return MARKET_FALLBACK
+
+    const genAI = new GoogleGenerativeAI(apiKey)
+    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' })
+
+    const prompt = `You are an expert short-term rental market analyst. Given the property address below, provide STR market estimates. Return ONLY valid JSON — no markdown, no backticks, no extra text.
+
+ADDRESS: ${address}
+
+Instructions:
+- adr: estimated average nightly rate for a typical STR in this market ($USD)
+- occupancyRate: estimated annual occupancy as a decimal (e.g. 0.65 for 65%)
+- revPAR: adr × occupancyRate
+- marketADR/marketOccupancy/marketRevPAR: broader market benchmarks for the area (slightly more conservative than the individual property estimate)
+- estimatedPurchasePrice: typical purchase price for an STR-viable property in this specific neighborhood/market
+- propertyTaxRate: estimated annual property tax as decimal of property value (e.g. 0.012 for 1.2%)
+- mortgageRate: current approximate 30-year fixed mortgage rate as decimal (e.g. 0.069)
+- marketType: short label e.g. "coastal beach", "urban", "ski/mountain", "lake house", "desert", "rural", "suburban"
+- seasonalityNote: one sentence describing peak/shoulder/off-season patterns
+- confidenceLevel: "high" if well-known STR market, "medium" if moderate data, "low" if limited info
+
+Return exactly this JSON:
+{
+  "city": "string",
+  "state": "string (2-letter abbreviation)",
+  "adr": number,
+  "occupancyRate": number,
+  "revPAR": number,
+  "marketADR": number,
+  "marketOccupancy": number,
+  "marketRevPAR": number,
+  "estimatedPurchasePrice": number,
+  "propertyTaxRate": number,
+  "mortgageRate": number,
+  "marketType": "string",
+  "seasonalityNote": "string",
+  "confidenceLevel": "high|medium|low"
+}`
+
+    const result = await model.generateContent(prompt)
+    const text = result.response.text().trim()
+    const clean = text.replace(/^```json?\s*/i, '').replace(/\s*```$/i, '').trim()
+    const p = JSON.parse(clean)
+
+    return {
+      city: p.city ?? '',
+      state: p.state ?? '',
+      adr: p.adr ?? MARKET_FALLBACK.adr,
+      occupancyRate: p.occupancyRate ?? MARKET_FALLBACK.occupancyRate,
+      revPAR: p.revPAR ?? (p.adr != null && p.occupancyRate != null ? p.adr * p.occupancyRate : MARKET_FALLBACK.revPAR),
+      marketADR: p.marketADR ?? p.adr ?? MARKET_FALLBACK.marketADR,
+      marketOccupancy: p.marketOccupancy ?? p.occupancyRate ?? MARKET_FALLBACK.marketOccupancy,
+      marketRevPAR: p.marketRevPAR ?? MARKET_FALLBACK.marketRevPAR,
+      estimatedPurchasePrice: p.estimatedPurchasePrice ?? MARKET_FALLBACK.estimatedPurchasePrice,
+      propertyTaxRate: p.propertyTaxRate ?? MARKET_FALLBACK.propertyTaxRate,
+      mortgageRate: p.mortgageRate ?? MARKET_FALLBACK.mortgageRate,
+      marketType: p.marketType ?? MARKET_FALLBACK.marketType,
+      seasonalityNote: p.seasonalityNote ?? MARKET_FALLBACK.seasonalityNote,
+      confidenceLevel: ['high', 'medium', 'low'].includes(p.confidenceLevel)
+        ? p.confidenceLevel
+        : 'low',
+    }
+  } catch {
+    return MARKET_FALLBACK
+  }
+}
 
 const FALLBACK: AISummary = {
   headline: 'Analysis complete — AI summary unavailable',
@@ -46,13 +133,12 @@ FINANCIAL SNAPSHOT:
 - RevPAR: $${analysis.revPAR.toFixed(0)}
 - GRM: ${analysis.grm.toFixed(1)}x
 
-STR MARKET (${fetched.rabbu.isMockData ? 'estimated — Wells, ME 04090' : 'live data'}):
+STR MARKET (${fetched.rabbu.source === 'gemini' ? 'Gemini AI estimate' : 'estimated defaults'}):
 - This deal ADR: $${inputs.expectedNightlyRate} vs Market ADR: $${fetched.rabbu.marketADR}
 - This deal occupancy: ${occPct}% vs Market: ${mktOccPct}%
 - Deal assumptions vs market: ${inputs.expectedNightlyRate > fetched.rabbu.marketADR ? 'ABOVE market ADR (optimistic)' : 'at or below market ADR (conservative)'}
 
-LOCATION SCORE: ${fetched.location?.overall ?? 'N/A'}/10
-INTEREST RATE: ${(inputs.interestRate * 100).toFixed(2)}% (${fetched.fred?.source === 'live' ? 'live FRED data' : 'estimated'})
+INTEREST RATE: ${(inputs.interestRate * 100).toFixed(2)}% (estimated)
 
 Return exactly this JSON shape:
 {

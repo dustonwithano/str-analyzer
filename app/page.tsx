@@ -156,7 +156,7 @@ export default function AnalyzerPage() {
                   value={(inp.interestRate * 100).toFixed(2)}
                   onChange={(v) => setInput('interestRate', String(toNum(v) / 100))}
                   step="0.01"
-                  badge={deal.fetched.fred?.source === 'live' ? 'FRED' : 'Est'}
+                  badge={deal.fetched.rabbu.source === 'gemini' ? 'Gemini' : 'Est'}
                 />
                 <InputField label="Loan Term (yrs)" value={inp.loanTermYears} onChange={(v) => setInput('loanTermYears', v)} step="1" />
               </InputSection>
@@ -319,7 +319,7 @@ export default function AnalyzerPage() {
                 <h3 className="text-xs font-mono uppercase tracking-widest text-[#6b7280]">
                   STR Market Context
                 </h3>
-                <DataBadge source={deal.fetched.rabbu.isMockData ? 'Estimated' : 'AirROI'} live={!deal.fetched.rabbu.isMockData} />
+                <DataBadge source={deal.fetched.rabbu.source === 'gemini' ? 'Gemini AI' : 'Estimated'} live={deal.fetched.rabbu.source === 'gemini'} />
               </div>
               <div className="grid grid-cols-3 gap-4">
                 <MarketCompare
@@ -370,12 +370,7 @@ export default function AnalyzerPage() {
             <div className="bg-[#161b27] border border-[#1f2937] rounded-lg p-4">
               <h3 className="text-[11px] font-mono uppercase tracking-widest text-[#4b5563] mb-3">Data Sources</h3>
               <div className="flex flex-wrap gap-2">
-                <DataBadge source="Geocoder" live={deal.fetched.geocoded?.source === 'live'} />
-                <DataBadge source="Zillow" live={deal.fetched.zillow?.source === 'live'} />
-                <DataBadge source="Rentcast" live={deal.fetched.rentcast?.source === 'live'} />
-                <DataBadge source={deal.fetched.rabbu.isMockData ? 'STR (Est.)' : 'AirROI'} live={!deal.fetched.rabbu.isMockData} />
-                <DataBadge source="FRED Rates" live={deal.fetched.fred?.source === 'live'} />
-                <DataBadge source="Location" live={deal.fetched.location?.source === 'live'} />
+                <DataBadge source={deal.fetched.rabbu.source === 'gemini' ? 'Gemini AI' : 'Estimated'} live={deal.fetched.rabbu.source === 'gemini'} />
               </div>
               <p className="text-[10px] font-mono text-[#374151] mt-2">
                 Analyzed: {new Date(deal.createdAt).toLocaleString()}

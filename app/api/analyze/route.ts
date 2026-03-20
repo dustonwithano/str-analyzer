@@ -1,13 +1,6 @@
 import { NextResponse } from 'next/server'
-import { geocodeAddress } from '@/lib/apis/geocoder'
-import { fetchZillowData } from '@/lib/apis/zillow'
-import { fetchRentcastData } from '@/lib/apis/rentcast'
-import { fetchRabbuData } from '@/lib/apis/rabbu'
-import { fetchMortgageRate } from '@/lib/apis/fred'
-import { getLocationScore } from '@/lib/apis/maps'
-import { getPropertyImage } from '@/lib/apis/propertyImage'
+import { estimateSTRMarket, generateDealSummary } from '@/lib/gemini'
 import { runUnderwriting } from '@/lib/underwriting'
-import { generateDealSummary } from '@/lib/gemini'
 import { saveDeal, slugify } from '@/lib/redis'
 import type { DealInputs, FetchedData, FullDeal, RabbuData } from '@/lib/types'
 
@@ -23,42 +16,43 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Address is required' }, { status: 400 })
     }
 
-    // 1. Geocode
-    const geocoded = await geocodeAddress(address.trim())
+    // 1. Gemini market estimate — city, state, ADR, occupancy, price, tax rate, etc.
+    const market = await estimateSTRMarket(address.trim())
 
-    // 2. Parallel API fetches — never let one failure block others
-    const [zillowResult, rentcastResult, rabbuResult, fredResult, locationResult] =
-      await Promise.allSettled([
-        fetchZillowData(geocoded.formattedAddress),
-        fetchRentcastData(geocoded.formattedAddress, 3),
-        fetchRabbuData(geocoded.zipCode, geocoded.city, geocoded.state),
-        fetchMortgageRate(),
-        getLocationScore(geocoded.formattedAddress, geocoded.lat, geocoded.lng),
-      ])
+    const rabbu: RabbuData = {
+      adr: market.adr,
+      occupancyRate: market.occupancyRate,
+      revPAR: market.revPAR,
+      marketADR: market.marketADR,
+      marketOccupancy: market.marketOccupancy,
+      marketRevPAR: market.marketRevPAR,
+      isMockData: !process.env.GEMINI_API_KEY,
+      source: process.env.GEMINI_API_KEY ? 'gemini' : 'mock',
+    }
 
-    const zillow = zillowResult.status === 'fulfilled' ? zillowResult.value : null
-    const rentcast = rentcastResult.status === 'fulfilled' ? rentcastResult.value : null
-    const rabbu: RabbuData =
-      rabbuResult.status === 'fulfilled'
-        ? rabbuResult.value
-        : { adr: 185, occupancyRate: 0.62, revPAR: 114.7, marketADR: 185, marketOccupancy: 0.62, marketRevPAR: 114.7, isMockData: true, source: 'mock' }
-    const fred = fredResult.status === 'fulfilled' ? fredResult.value : null
-    const location = locationResult.status === 'fulfilled' ? locationResult.value : null
+    const fetched: FetchedData = {
+      geocoded: {
+        formattedAddress: address.trim(),
+        lat: 0,
+        lng: 0,
+        zipCode: '',
+        city: market.city,
+        state: market.state,
+        placeId: null,
+        source: 'failed',
+      },
+      zillow: null,
+      rentcast: null,
+      rabbu,
+      fred: null,
+      location: null,
+      propertyImage: { url: null, source: 'placeholder', isFallback: true },
+    }
 
-    // 3. Property image
-    const propertyImage = await getPropertyImage(
-      geocoded.formattedAddress,
-      zillow?.zpid,
-      zillow?.imgSrc,
-      geocoded.placeId
-    )
-
-    const fetched: FetchedData = { geocoded, zillow, rentcast, rabbu, fred, location, propertyImage }
-
-    // 4. Build inputs from fetched data + defaults
-    const purchasePrice = zillow?.listPrice ?? zillow?.zestimate ?? 650000
-    const interestRate = fred?.rate ?? 0.0695
-    const propertyTaxAnnual = zillow?.propertyTaxAnnual ?? purchasePrice * 0.012
+    // 2. Build inputs from Gemini estimates + defaults
+    const purchasePrice = market.estimatedPurchasePrice
+    const interestRate = market.mortgageRate
+    const propertyTaxAnnual = purchasePrice * market.propertyTaxRate
 
     const baseInputs: DealInputs = {
       purchasePrice,
@@ -82,14 +76,14 @@ export async function POST(req: Request) {
       ...overrides,
     }
 
-    // 5. Run underwriting
+    // 3. Run underwriting
     const analysis = runUnderwriting(baseInputs)
 
-    // 6. Build deal object
-    const id = slugify(geocoded.formattedAddress)
+    // 4. Build deal object
+    const id = slugify(address.trim())
     const deal: FullDeal = {
       id,
-      address: geocoded.formattedAddress,
+      address: address.trim(),
       createdAt: new Date().toISOString(),
       inputs: baseInputs,
       fetched,
@@ -98,14 +92,14 @@ export async function POST(req: Request) {
       isMockData: rabbu.isMockData,
     }
 
-    // 7. Gemini summary (non-blocking failure)
+    // 5. Gemini deal summary (non-blocking)
     try {
       deal.aiSummary = await generateDealSummary(deal)
     } catch {
       deal.aiSummary = null
     }
 
-    // 8. Save to Redis (non-blocking failure)
+    // 6. Save to Redis (non-blocking)
     let redisSaved = true
     try {
       await saveDeal(deal)

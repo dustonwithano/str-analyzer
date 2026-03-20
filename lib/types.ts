@@ -104,7 +104,24 @@ export interface RabbuData {
   marketOccupancy: number
   marketRevPAR: number
   isMockData: boolean
-  source: 'live' | 'mock' | 'failed'
+  source: 'live' | 'mock' | 'failed' | 'gemini'
+}
+
+export interface STRMarketEstimate {
+  city: string
+  state: string
+  adr: number
+  occupancyRate: number
+  revPAR: number
+  marketADR: number
+  marketOccupancy: number
+  marketRevPAR: number
+  estimatedPurchasePrice: number
+  propertyTaxRate: number
+  mortgageRate: number
+  marketType: string
+  seasonalityNote: string
+  confidenceLevel: 'high' | 'medium' | 'low'
 }
 
 export interface FredData {
