@@ -16,24 +16,27 @@ export function slugify(address: string): string {
     .replace(/-$/, '')
 }
 
+const KEY_DEAL = (id: string) => `str:deal:${id}`
+const KEY_INDEX = 'str:deals:index'
+
 export async function saveDeal(deal: FullDeal): Promise<void> {
-  await redis.set(`deal:${deal.id}`, deal)
+  await redis.set(KEY_DEAL(deal.id), deal)
   // Add to index only if not already present
-  const existing = await redis.lrange<string>('deals:index', 0, -1)
+  const existing = await redis.lrange<string>(KEY_INDEX, 0, -1)
   if (!existing.includes(deal.id)) {
-    await redis.lpush('deals:index', deal.id)
+    await redis.lpush(KEY_INDEX, deal.id)
   }
 }
 
 export async function getDeal(slug: string): Promise<FullDeal | null> {
-  return await redis.get<FullDeal>(`deal:${slug}`)
+  return await redis.get<FullDeal>(KEY_DEAL(slug))
 }
 
 export async function getAllDeals(): Promise<DealSummary[]> {
-  const slugs = await redis.lrange<string>('deals:index', 0, -1)
+  const slugs = await redis.lrange<string>(KEY_INDEX, 0, -1)
   if (!slugs.length) return []
 
-  const deals = await Promise.all(slugs.map((slug) => redis.get<FullDeal>(`deal:${slug}`)))
+  const deals = await Promise.all(slugs.map((slug) => redis.get<FullDeal>(KEY_DEAL(slug))))
 
   return deals
     .filter((d): d is FullDeal => d !== null)
@@ -52,11 +55,11 @@ export async function getAllDeals(): Promise<DealSummary[]> {
 }
 
 export async function deleteDeal(slug: string): Promise<void> {
-  await redis.del(`deal:${slug}`)
-  const slugs = await redis.lrange<string>('deals:index', 0, -1)
+  await redis.del(KEY_DEAL(slug))
+  const slugs = await redis.lrange<string>(KEY_INDEX, 0, -1)
   const filtered = slugs.filter((s: string) => s !== slug)
-  await redis.del('deals:index')
+  await redis.del(KEY_INDEX)
   if (filtered.length > 0) {
-    await redis.rpush('deals:index', ...filtered)
+    await redis.rpush(KEY_INDEX, ...filtered)
   }
 }
