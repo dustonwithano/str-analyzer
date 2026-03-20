@@ -166,14 +166,14 @@ export default function AnalyzerPage() {
                   label="Nightly Rate $"
                   value={inp.expectedNightlyRate}
                   onChange={(v) => setInput('expectedNightlyRate', v)}
-                  badge={deal.fetched.rabbu.isMockData ? 'Est' : 'AirROI'}
+                  badge={deal.fetched.rabbu.source === 'gemini' ? 'Gemini' : 'Est'}
                 />
                 <InputField
                   label="Occupancy %"
                   value={(inp.occupancyRate * 100).toFixed(0)}
                   onChange={(v) => setInput('occupancyRate', String(toNum(v) / 100))}
                   step="1"
-                  badge={deal.fetched.rabbu.isMockData ? 'Est' : 'AirROI'}
+                  badge={deal.fetched.rabbu.source === 'gemini' ? 'Gemini' : 'Est'}
                 />
                 <InputField label="Avg Stay (nights)" value={inp.avgStayLengthNights} onChange={(v) => setInput('avgStayLengthNights', v)} step="0.5" />
               </InputSection>
