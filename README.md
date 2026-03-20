@@ -1,36 +1,80 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# STR Analyzer
 
-## Getting Started
+A full-stack short-term rental deal analyzer built with Next.js. Enter a property address and get a comprehensive underwriting report with AI-powered deal summary.
 
-First, run the development server:
+## Features
+
+- **Financial underwriting** — mortgage P&I, NOI, cap rate, cash-on-cash, RevPAR, DSCR, break-even occupancy, GRM
+- **10-year projections** — rent growth, appreciation, principal paydown
+- **Market context** — compare your assumptions vs. market ADR/occupancy/RevPAR
+- **AI deal summary** — Gemini-powered green/red flags and strategy recommendation
+- **Location score** — STR suitability based on nearby amenities
+- **Property image** — Zillow photo → Street View → Places fallback chain
+- **Deal history** — all analyses saved to Upstash Redis, viewable/deletable
+- **Re-analyze** — update any assumption and re-run with current FRED mortgage rates
+
+## Setup
+
+### 1. Install dependencies
+
+```bash
+npm install
+```
+
+### 2. Configure environment variables
+
+Copy the example file and fill in your keys:
+
+```bash
+cp .env.local.example .env.local
+```
+
+| Variable | Required | Source |
+|---|---|---|
+| `UPSTASH_REDIS_REST_URL` | Yes | [upstash.com](https://upstash.com) → Redis → REST URL |
+| `UPSTASH_REDIS_REST_TOKEN` | Yes | [upstash.com](https://upstash.com) → Redis → REST Token |
+| `GEMINI_API_KEY` | Recommended | [aistudio.google.com](https://aistudio.google.com) |
+| `ZILLOW_RAPIDAPI_KEY` | Optional | RapidAPI → Zillow56 |
+| `RENTCAST_API_KEY` | Optional | [rentcast.io](https://rentcast.io) |
+| `RABBU_API_KEY` | Optional | [rabbu.com](https://rabbu.com) — STR market data |
+| `FRED_API_KEY` | Optional | [fred.stlouisfed.org](https://fred.stlouisfed.org/docs/api/api_key.html) |
+| `GOOGLE_MAPS_API_KEY` | Optional | Google Cloud Console (Maps + Places APIs) |
+
+**Minimum to run:** Only `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` are strictly required. All other APIs gracefully fall back to mock/estimated data. Without `GEMINI_API_KEY` the AI summary section is hidden.
+
+### 3. Run development server
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## How it works
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+1. Enter a property address and click **Analyze Deal**
+2. The API pipeline runs in parallel:
+   - Geocodes the address
+   - Fetches Zillow listing data (purchase price, tax, image)
+   - Fetches Rentcast rental comps
+   - Fetches Rabbu STR market metrics (ADR, occupancy, RevPAR)
+   - Fetches current 30-yr mortgage rate from FRED
+   - Scores the location via Google Places
+3. Financial model runs underwriting with all fetched data as defaults
+4. Gemini analyzes the deal and returns structured flags + recommendations
+5. Results saved to Redis; viewable later in **Deal History**
 
-## Learn More
+## Pages
 
-To learn more about Next.js, take a look at the following resources:
+- `/` — Main analyzer with editable inputs and full results
+- `/history` — All past analyses in a sortable table
+- `/deals/[slug]` — Read-only view of any saved deal with re-analyze option
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Tech stack
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- **Next.js 16** (App Router)
+- **Upstash Redis** — serverless deal storage
+- **Google Gemini 2.0 Flash** — AI summaries
+- **Recharts** — 10-year projection chart
+- **Tailwind CSS v4** — dark terminal aesthetic
+- **date-fns**, **clsx**, **lucide-react**
