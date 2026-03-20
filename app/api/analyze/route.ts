@@ -31,7 +31,7 @@ export async function POST(req: Request) {
       await Promise.allSettled([
         fetchZillowData(geocoded.formattedAddress),
         fetchRentcastData(geocoded.formattedAddress, 3),
-        fetchRabbuData(geocoded.zipCode, geocoded.city),
+        fetchRabbuData(geocoded.zipCode, geocoded.city, geocoded.state),
         fetchMortgageRate(),
         getLocationScore(geocoded.formattedAddress, geocoded.lat, geocoded.lng),
       ])

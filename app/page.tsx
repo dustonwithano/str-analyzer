@@ -166,14 +166,14 @@ export default function AnalyzerPage() {
                   label="Nightly Rate $"
                   value={inp.expectedNightlyRate}
                   onChange={(v) => setInput('expectedNightlyRate', v)}
-                  badge={deal.fetched.rabbu.isMockData ? 'Est' : 'Rabbu'}
+                  badge={deal.fetched.rabbu.isMockData ? 'Est' : 'AirROI'}
                 />
                 <InputField
                   label="Occupancy %"
                   value={(inp.occupancyRate * 100).toFixed(0)}
                   onChange={(v) => setInput('occupancyRate', String(toNum(v) / 100))}
                   step="1"
-                  badge={deal.fetched.rabbu.isMockData ? 'Est' : 'Rabbu'}
+                  badge={deal.fetched.rabbu.isMockData ? 'Est' : 'AirROI'}
                 />
                 <InputField label="Avg Stay (nights)" value={inp.avgStayLengthNights} onChange={(v) => setInput('avgStayLengthNights', v)} step="0.5" />
               </InputSection>
@@ -319,7 +319,7 @@ export default function AnalyzerPage() {
                 <h3 className="text-xs font-mono uppercase tracking-widest text-[#6b7280]">
                   STR Market Context
                 </h3>
-                <DataBadge source={deal.fetched.rabbu.isMockData ? 'Estimated' : 'Rabbu'} live={!deal.fetched.rabbu.isMockData} />
+                <DataBadge source={deal.fetched.rabbu.isMockData ? 'Estimated' : 'AirROI'} live={!deal.fetched.rabbu.isMockData} />
               </div>
               <div className="grid grid-cols-3 gap-4">
                 <MarketCompare
@@ -373,7 +373,7 @@ export default function AnalyzerPage() {
                 <DataBadge source="Geocoder" live={deal.fetched.geocoded?.source === 'live'} />
                 <DataBadge source="Zillow" live={deal.fetched.zillow?.source === 'live'} />
                 <DataBadge source="Rentcast" live={deal.fetched.rentcast?.source === 'live'} />
-                <DataBadge source={deal.fetched.rabbu.isMockData ? 'STR (Est.)' : 'Rabbu'} live={!deal.fetched.rabbu.isMockData} />
+                <DataBadge source={deal.fetched.rabbu.isMockData ? 'STR (Est.)' : 'AirROI'} live={!deal.fetched.rabbu.isMockData} />
                 <DataBadge source="FRED Rates" live={deal.fetched.fred?.source === 'live'} />
                 <DataBadge source="Location" live={deal.fetched.location?.source === 'live'} />
               </div>
