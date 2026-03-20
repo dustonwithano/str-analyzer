@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { estimateSTRMarket, generateDealSummary } from '@/lib/gemini'
+import { fetchZillowData } from '@/lib/apis/zillow'
 import { runUnderwriting } from '@/lib/underwriting'
 import { saveDeal, slugify } from '@/lib/redis'
 import type { DealInputs, FetchedData, FullDeal, RabbuData } from '@/lib/types'
@@ -16,8 +17,11 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Address is required' }, { status: 400 })
     }
 
-    // 1. Gemini market estimate — city, state, ADR, occupancy, price, tax rate, etc.
-    const market = await estimateSTRMarket(address.trim())
+    // 1. Gemini market estimate + Zillow property data in parallel
+    const [market, zillow] = await Promise.all([
+      estimateSTRMarket(address.trim()),
+      fetchZillowData(address.trim()),
+    ])
 
     const rabbu: RabbuData = {
       adr: market.adr,
@@ -41,7 +45,7 @@ export async function POST(req: Request) {
         placeId: null,
         source: 'failed',
       },
-      zillow: null,
+      zillow,
       rentcast: null,
       rabbu,
       fred: null,
@@ -49,10 +53,10 @@ export async function POST(req: Request) {
       propertyImage: { url: null, source: 'placeholder', isFallback: true },
     }
 
-    // 2. Build inputs from Gemini estimates + defaults
-    const purchasePrice = market.estimatedPurchasePrice
+    // 2. Build inputs — Zillow wins for property-specific data, Gemini fills gaps
+    const purchasePrice = zillow?.listPrice ?? zillow?.zestimate ?? market.estimatedPurchasePrice
     const interestRate = market.mortgageRate
-    const propertyTaxAnnual = purchasePrice * market.propertyTaxRate
+    const propertyTaxAnnual = zillow?.propertyTaxAnnual ?? purchasePrice * market.propertyTaxRate
 
     const baseInputs: DealInputs = {
       purchasePrice,

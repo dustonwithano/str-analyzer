@@ -198,6 +198,7 @@ export default function DealDetailPage() {
         <h3 className="text-[11px] font-mono uppercase tracking-widest text-[#4b5563] mb-3">Data Sources</h3>
         <div className="flex flex-wrap gap-2">
           <DataBadge source={deal.fetched.rabbu.source === 'gemini' ? 'Gemini AI' : 'Estimated'} live={deal.fetched.rabbu.source === 'gemini'} />
+          <DataBadge source="Zillow" live={deal.fetched.zillow?.source === 'live'} />
         </div>
       </div>
     </div>
